@@ -41,8 +41,8 @@ A Python script for downloading YouTube videos by extracting available resolutio
    - Clone this repository or download it as a ZIP file, then navigate to the folder containing the script.
 
    ```sh
-   git clone https://github.com/sunsx/youtube-video-downloader.git
-   cd youtube-video-downloader
+   git clone https://github.com/sunshaoxuan/BoBDownloader.git
+   cd BoBDownloader
    ```
 
 2. **Run the Script**
@@ -73,6 +73,37 @@ Enter the number corresponding to the resolution you wish to download: 1
 Starting download: 720p...
 Download completed: "video_title_720p.mp4"
 ```
+
+## Packaging
+
+To make the downloader available as an executable, you can use the provided packaging scripts.
+
+### Windows Packaging
+
+1. **Use PowerShell Script**
+
+   - There is a PowerShell script (`build.ps1`) provided for packaging the downloader into a Windows executable.
+   - Run the following command in PowerShell:
+
+     ```powershell
+     .\build.ps1
+     ```
+
+   - This will create an executable file named `BoBDownloader_win.exe` in the `dist` folder.
+
+### macOS and Linux Packaging
+
+1. **Use Bash Script**
+
+   - There is a bash script (`build.sh`) provided for packaging the downloader into executables for Windows, macOS, or Linux.
+   - Run the following command in your terminal:
+
+     ```sh
+     ./build.sh [windows|macos|linux]
+     ```
+
+   - Replace `[windows|macos|linux]` with your desired target platform.
+   - The executable will be created in the `dist` folder with the appropriate name for the platform.
 
 ## Script Overview
 
@@ -116,4 +147,3 @@ For any questions or issues, please open an issue on the GitHub repository, or c
 ---
 
 **Disclaimer**: This script is for educational purposes only. Downloading videos from YouTube may violate YouTube's terms of service. Please ensure that you have permission to download any content and do not use this script for unauthorized purposes.
-
