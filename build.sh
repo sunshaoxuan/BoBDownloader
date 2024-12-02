@@ -13,7 +13,7 @@ mkdir -p dist
 # Windows packaging (cross-compilation on Linux/macOS is not straightforward, better to use a Windows machine for this)
 function build_windows_exe {
     echo "Building Windows executable..."
-    pyinstaller --onefile --name "BoBDownloader_win" down.py
+    pyinstaller --onefile --name "BoBDownloader_win" BoBDownloader.py
     if [ $? -eq 0 ]; then
         echo "Windows executable created successfully."
         mv dist/BoBDownloader_win.exe dist/
@@ -25,7 +25,7 @@ function build_windows_exe {
 # macOS packaging
 function build_macos_exec {
     echo "Building macOS executable..."
-    pyinstaller --onefile --name "BoBDownloader_mac" down.py
+    pyinstaller --onefile --name "BoBDownloader_mac" BoBDownloader.py
     if [ $? -eq 0 ]; then
         echo "macOS executable created successfully."
         mv dist/BoBDownloader_mac dist/
@@ -37,7 +37,7 @@ function build_macos_exec {
 # Linux packaging
 function build_linux_exec {
     echo "Building Linux executable..."
-    pyinstaller --onefile --name "BoBDownloader_linux" down.py
+    pyinstaller --onefile --name "BoBDownloader_linux" BoBDownloader.py
     if [ $? -eq 0 ]; then
         echo "Linux executable created successfully."
         mv dist/BoBDownloader_linux dist/
