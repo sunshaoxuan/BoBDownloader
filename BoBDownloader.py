@@ -4,6 +4,8 @@ import requests
 import argparse
 from bs4 import BeautifulSoup
 from cryptography.fernet import Fernet
+import os
+import time  # Import time module to track download time
 
 # SECRET KEY
 secret_key = b'GIgwb1iHbTv8WNH6lewJD2Xl_wukBT8eH9ApXV5NyWs='
@@ -198,13 +200,20 @@ def analyze_video(video_url):
         print(f"Request failed: {e}")
         return None
 
-def download_video(download_url, title, resolution, file_type):
+def download_video(download_url, title, resolution, file_type, output_path=None):
     try:
         # Sanitize the filename
         sanitized_title = sanitize_filename(title)
 
-        output_file = f"{sanitized_title}_{resolution}.{file_type}"
-        
+        # Determine the output file path
+        if output_path:
+            if os.path.isdir(output_path):
+                output_file = os.path.join(output_path, f"{sanitized_title}_{resolution}.{file_type}")
+            else:
+                output_file = output_path
+        else:
+            output_file = f"{sanitized_title}_{resolution}.{file_type}"
+
         # Download the file using the provided link
         print(f"File name: {output_file}")
         response = requests.get(download_url, stream=True)
@@ -212,6 +221,7 @@ def download_video(download_url, title, resolution, file_type):
 
         total_size = int(response.headers.get('content-length', 0))
         downloaded_size = 0
+        start_time = time.time()  # Record the start time
 
         with open(output_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=1024):
@@ -222,6 +232,13 @@ def download_video(download_url, title, resolution, file_type):
                     # Calculate percentage
                     percentage = (downloaded_size / total_size) * 100 if total_size else 0
                     
+                    # Calculate download speed
+                    elapsed_time = time.time() - start_time
+                    speed = downloaded_size / elapsed_time if elapsed_time > 0 else 0
+                    
+                    # Estimate time remaining
+                    time_remaining = (total_size - downloaded_size) / speed if speed > 0 else float('inf')
+                    
                     # Convert bytes to a human-readable format
                     def human_readable_size(size, decimal_places=2):
                         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -231,7 +248,8 @@ def download_video(download_url, title, resolution, file_type):
                         return f"{size:.{decimal_places}f} PB"
 
                     # Clear the line and display the download progress
-                    print(f"\r{' ' * 80}\rDownloaded {human_readable_size(downloaded_size)} of {human_readable_size(total_size)} ({percentage:.2f}%)", end='', flush=True)
+                    print(f"\r{' ' * 80}\rDownloaded {human_readable_size(downloaded_size)} of {human_readable_size(total_size)} ({percentage:.2f}%) "
+                          f"at {human_readable_size(speed)}/s, ETA: {time_remaining:.2f}s", end='', flush=True)
 
         print(f"\nDownload completed: {output_file}")
     except requests.exceptions.RequestException as e:
@@ -246,12 +264,14 @@ if __name__ == "__main__":
         )
         parser.add_argument("video_url", help="URL of the YouTube video to download")
         parser.add_argument("--resolution", help="Preferred resolution for download (e.g., 720p)", default=None)
+        parser.add_argument("--output", help="Output path or filename for the downloaded video", default=None)
         parser.add_argument('--version', action='version', version='%(prog)s 1.0.1')
         args = parser.parse_args()
 
         # Get the video URL
         video_url = args.video_url
         preferred_resolution = args.resolution
+        output_path = args.output
         print(f"\r{' ' * 80}\rAnalyzing video URL: {video_url}...", end='')
         html_fragment = analyze_video(video_url)
         print("Analysis complete.")
@@ -272,6 +292,6 @@ if __name__ == "__main__":
 
                 if download_url:
                     print("Downloading the video...")
-                    download_video(download_url, download_info["title"], download_info["note"], download_info["ext"])
+                    download_video(download_url, download_info["title"], download_info["note"], download_info["ext"], output_path)
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
