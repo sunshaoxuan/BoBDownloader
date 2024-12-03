@@ -244,6 +244,7 @@ if __name__ == "__main__":
         )
         parser.add_argument("video_url", help="URL of the YouTube video to download")
         parser.add_argument("--resolution", help="Preferred resolution for download (e.g., 720p)", default=None)
+        parser.add_argument('--version', action='version', version='%(prog)s 0.1')
         args = parser.parse_args()
 
         # Get the video URL
