@@ -5,28 +5,24 @@ import argparse
 from bs4 import BeautifulSoup
 from cryptography.fernet import Fernet
 
-def sanitize_filename(filename):
-    """
-    Sanitize the filename by removing illegal characters
-    """
-    return re.sub(r'[\\/*?:"<>|]', "_", filename)
+# SECRET KEY
+secret_key = b'GIgwb1iHbTv8WNH6lewJD2Xl_wukBT8eH9ApXV5NyWs='
+
+# ENCRYPTED CONFIG
+encrypted_config = b'gAAAAABnTlZM5RWhy_zIlX_8rfXtFWQOjtMsj_ipJzY355li_ibOWokSb0JLLvCUOj5Dz_fp5MOA3GfGZGAhXlWGkZXZZ9u72pDIqN2DapbeNYeFPXaJOKftFLYbz09Hmy9XS_5mY-3P22PuP4SaX3NCo0lRWB85OQja2KrsvHi_Ir5VGDD-hlNkN64a8h7T4rUO6vRpMdXmyTw8fBkeaIMnqtkI0JEmw7btPJdIwe7VGBZzgw2O2F8='
 
 def load_encrypted_data(data_type):
-    # read the key
-    with open("secret.key", "rb") as key_file:
-        key = key_file.read()
+    try:
+        # Decrypt the data
+        cipher_suite = Fernet(secret_key)
+        decrypted_data = cipher_suite.decrypt(encrypted_config).decode()
 
-    # read the encrypted data
-    with open(".config", "rb") as config_file:
-        encrypted_data = config_file.read()
+        # Return the corresponding data
+        data_dict = json.loads(decrypted_data)
+        return data_dict.get(data_type)
 
-    # decrypt the data
-    cipher_suite = Fernet(key)
-    decrypted_data = cipher_suite.decrypt(encrypted_data).decode()
-
-    # return the corresponding data
-    data_dict = json.loads(decrypted_data)
-    return data_dict.get(data_type)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 def load_encrypted_url():
     return load_encrypted_data("url")
@@ -34,9 +30,15 @@ def load_encrypted_url():
 def load_encrypted_service_url():
     return load_encrypted_data("service_url")
 
+def sanitize_filename(filename):
+    """
+    Sanitize the filename by removing illegal characters
+    """
+    return re.sub(r'[\\/*?:"<>|]', "_", filename)
+
 def get_download_url(download_info):
     try:
-        # decrypt the URL
+        # Decrypt the URL
         download_host_url = load_encrypted_url() + download_info['id']
         headers = {
             "x-note": download_info["note"]
