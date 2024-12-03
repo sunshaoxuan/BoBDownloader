@@ -3,6 +3,7 @@ import json
 import requests
 import argparse
 from bs4 import BeautifulSoup
+from cryptography.fernet import Fernet
 
 def sanitize_filename(filename):
     """
@@ -10,9 +11,25 @@ def sanitize_filename(filename):
     """
     return re.sub(r'[\\/*?:"<>|]', "_", filename)
 
+def load_encrypted_url():
+    # read the key
+    with open("secret.key", "rb") as key_file:
+        key = key_file.read()
+
+    # read the encrypted URL
+    with open(".config", "rb") as config_file:
+        encrypted_url = config_file.read()
+
+    # decrypt the URL
+    cipher_suite = Fernet(key)
+    decrypted_url = cipher_suite.decrypt(encrypted_url).decode()
+
+    return decrypted_url
+
 def get_download_url(download_info):
     try:
-        download_host_url = f"https://genyoutube.online/mates/en/convert?id={download_info['id']}"
+        # decrypt the URL
+        download_host_url = load_encrypted_url() + download_info['id']
         headers = {
             "x-note": download_info["note"]
         }
@@ -84,7 +101,7 @@ def extract_outermost_div_and_script(html_content):
         print(f"Error extracting address: {e}")
         return None
 
-def parse_div_section_ex(div_content):
+def parse_div_section_ex(div_content, preferred_resolution=None):
     """
     Parse the <div> section to extract information for all available resolutions, and let the user choose
     """
@@ -120,6 +137,13 @@ def parse_div_section_ex(div_content):
         if not options:
             print("No available resolution information found")
             return None
+
+        # If the preferred resolution is specified, try to find it in the options
+        if preferred_resolution:
+            for option in options:
+                if preferred_resolution in option['resolution']:
+                    return option
+            print(f"Preferred resolution {preferred_resolution} not found, please choose manually.")
 
         # List all available resolutions and let the user choose
         print("\nAvailable Resolutions:")
@@ -172,39 +196,65 @@ def download_video(download_url, title, resolution, file_type):
         output_file = f"{sanitized_title}_{resolution}.{file_type}"
         
         # Download the file using the provided link
-        print(f"Starting download: {download_url}")
+        print(f"File name: {output_file}")
         response = requests.get(download_url, stream=True)
         response.raise_for_status()
+
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded_size = 0
 
         with open(output_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
-        print(f"Download completed: {output_file}")
+                    downloaded_size += len(chunk)
+                    
+                    # Calculate percentage
+                    percentage = (downloaded_size / total_size) * 100 if total_size else 0
+                    
+                    # Convert bytes to a human-readable format
+                    def human_readable_size(size, decimal_places=2):
+                        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                            if size < 1024.0:
+                                return f"{size:.{decimal_places}f} {unit}"
+                            size /= 1024.0
+                        return f"{size:.{decimal_places}f} PB"
+
+                    # Clear the line and display the download progress
+                    print(f"\r{' ' * 80}\rDownloaded {human_readable_size(downloaded_size)} of {human_readable_size(total_size)} ({percentage:.2f}%)", end='', flush=True)
+
+        print(f"\nDownload completed: {output_file}")
     except requests.exceptions.RequestException as e:
         print(f"Download failed: {e}")
 
 # Main program
 if __name__ == "__main__":
-    # Use argparse to get command line arguments
-    parser = argparse.ArgumentParser(description="YouTube Video Downloader Script")
-    parser.add_argument("video_url", help="URL of the YouTube video to download")
-    args = parser.parse_args()
+    try:
+        # Use argparse to get command line arguments
+        parser = argparse.ArgumentParser(description="YouTube Video Downloader Script")
+        parser.add_argument("video_url", help="URL of the YouTube video to download")
+        parser.add_argument("--resolution", help="Preferred resolution for download (e.g., 720p)", default=None)
+        args = parser.parse_args()
 
-    # Get the video URL
-    video_url = args.video_url
-    html_fragment = analyze_video(video_url)
-    
-    print(f"Analyzing video URL: {video_url}...")
-    div_section = extract_outermost_div_and_script(html_fragment)
+        # Get the video URL
+        video_url = args.video_url
+        preferred_resolution = args.resolution
+        print(f"Analyzing video URL: {video_url}...")
+        html_fragment = analyze_video(video_url)
 
-    if div_section:
-        print("Fetching download information...")
-        download_info = parse_div_section_ex(div_section)
+        print("Fetching the resolution information...")    
+        div_section = extract_outermost_div_and_script(html_fragment)
 
-        if download_info:
-            print("Parsing download URL...")
-            download_url = get_download_url(download_info)
+        if div_section:
+            print("Fetching download information...")
+            download_info = parse_div_section_ex(div_section, preferred_resolution)
 
-            if download_url:
-                download_video(download_url, download_info["title"], download_info["note"], download_info["ext"])
+            if download_info:
+                print("Parsing download URL...")
+                download_url = get_download_url(download_info)
+
+                if download_url:
+                    print("Downloading the video...")
+                    download_video(download_url, download_info["title"], download_info["note"], download_info["ext"])
+    except KeyboardInterrupt:
+        print("\nProgram interrupted by user.")

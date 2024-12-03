@@ -5,15 +5,18 @@ A Python script for downloading YouTube videos by extracting available resolutio
 ## Features
 
 - Extract video metadata from a YouTube link, including available resolutions and file sizes.
-- Allows the user to choose from available resolutions before downloading.
+- Allows the user to choose from available resolutions before downloading or specify a preferred resolution as a command-line argument.
 - Downloads the selected video resolution with proper filename sanitization to prevent issues with file saving.
-- Command-line support for easy usage.
+- Command-line support for easy usage, with options for specifying a preferred resolution.
+- Encrypted URL management for enhanced security.
+- Detailed download progress with human-readable file sizes.
 
 ## Requirements
 
 - Python 3.x
 - `requests` library: for making HTTP requests to the analysis service.
 - `beautifulsoup4` library: for parsing the HTML content.
+- `cryptography` library: for handling encrypted URLs.
 
 ## Installation
 
@@ -29,9 +32,9 @@ A Python script for downloading YouTube videos by extracting available resolutio
 
 2. **Install Dependencies**
 
-   - You will need the `requests` and `beautifulsoup4` packages. You can install these packages via pip:
+   - You will need the `requests`, `beautifulsoup4`, and `cryptography` packages. You can install these packages via pip:
      ```sh
-     pip3 install requests beautifulsoup4
+     pip3 install requests beautifulsoup4 cryptography
      ```
 
 ## Usage
@@ -47,31 +50,31 @@ A Python script for downloading YouTube videos by extracting available resolutio
 
 2. **Run the Script**
 
-   - The script can be executed using the command line by passing the YouTube video URL as an argument:
+   - The script can be executed using the command line by passing the YouTube video URL as an argument. You can also specify a preferred resolution using the `--resolution` flag:
 
      ```sh
-     python3 down.py "https://www.youtube.com/watch?v=VIDEO_ID"
+     python3 down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p
      ```
 
    - If you do not pass the video URL, the script will prompt you to provide a valid URL.
 
 3. **Select Video Resolution**
 
-   - After running the script, it will present you with a list of available resolutions and their respective file sizes. Enter the number corresponding to the desired resolution to start the download.
+   - After running the script, it will present you with a list of available resolutions and their respective file sizes if no preferred resolution is specified. Enter the number corresponding to the desired resolution to start the download.
 
 ## Example
 
 ```sh
-$ python3 down.py "https://www.youtube.com/watch?v=gV5rQFCgCjA"
+$ python3 down.py "https://www.youtube.com/watch?v=gV5rQFCgCjA" --resolution 720p
 
-Available Resolutions:
-1. Resolution: 720p, Size: 22.62M
-2. Resolution: 480p, Size: 15.43M
-3. Resolution: 360p, Size: 10.12M
-
-Enter the number corresponding to the resolution you wish to download: 1
-Starting download: 720p...
-Download completed: "video_title_720p.mp4"
+Analyzing video URL: https://www.youtube.com/watch?v=gV5rQFCgCjA...
+Fetching the resolution information...
+Fetching download information...
+Parsing download URL...
+Downloading the video...
+File name: video_title_720p.mp4
+Downloaded 22.62 MB of 22.62 MB (100.00%)
+Download completed: video_title_720p.mp4
 ```
 
 ## Packaging
@@ -89,7 +92,7 @@ To make the downloader available as an executable, you can use the provided pack
      .\build.ps1
      ```
 
-   - This will create an executable file named `BoBDownloader_win.exe` in the `dist` folder.
+   - This will create an executable file named `BoBDownloader_win.exe` in the `release` folder.
 
 ### macOS and Linux Packaging
 
@@ -103,16 +106,17 @@ To make the downloader available as an executable, you can use the provided pack
      ```
 
    - Replace `[windows|macos|linux]` with your desired target platform.
-   - The executable will be created in the `dist` folder with the appropriate name for the platform.
+   - The executable will be created in the `release` folder with the appropriate name for the platform.
 
 ## Script Overview
 
 - **`analyze_video(video_url)`**: Sends a POST request to an external analysis service to extract information about available resolutions and formats for the provided video URL.
-- **`extract_outermost_div_and_script(html_content)`**: Extracts the main `<div>` and `<script>` tags containing video information from the returned HTML content.
-- **`parse_div_section(div_content)`**: Parses the `<div>` content to extract information on available resolutions and presents them for the user to choose from.
+- **`extract_outermost_div_and_script(html_content)`**: Extracts the main `<div>` tag containing video information from the returned HTML content.
+- **`parse_div_section_ex(div_content, preferred_resolution)`**: Parses the `<div>` content to extract information on available resolutions, presents them for the user to choose from, or selects the preferred resolution if specified.
 - **`get_download_url(download_info)`**: Sends a POST request to retrieve the actual download URL for the video.
-- **`download_video(download_url, title, resolution, file_type)`**: Downloads the video from the generated download URL.
+- **`download_video(download_url, title, resolution, file_type)`**: Downloads the video from the generated download URL and provides real-time progress updates.
 - **`sanitize_filename(filename)`**: Sanitizes filenames to remove illegal characters for cross-platform compatibility.
+- **`load_encrypted_url()`**: Loads and decrypts the base URL for requesting download information.
 
 ## Requirements and Notes
 
@@ -122,10 +126,10 @@ To make the downloader available as an executable, you can use the provided pack
 
 ## Troubleshooting
 
-- **Missing Dependencies**: Ensure all required Python packages (`requests`, `beautifulsoup4`) are installed. Use the following command to install missing dependencies:
+- **Missing Dependencies**: Ensure all required Python packages (`requests`, `beautifulsoup4`, `cryptography`) are installed. Use the following command to install missing dependencies:
 
   ```sh
-  pip3 install requests beautifulsoup4
+  pip3 install requests beautifulsoup4 cryptography
   ```
 
 - **FileNotFoundError**: When saving the video, if the script reports a `FileNotFoundError`, it could be due to illegal characters in the filename. The script sanitizes filenames, but if this issue persists, manually modify the video title to remove any unusual characters.
