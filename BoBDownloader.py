@@ -242,11 +242,11 @@ if __name__ == "__main__":
     try:
         # Use argparse to get command line arguments
         parser = argparse.ArgumentParser(
-            description="BoB YouTube Video Downloader Script (Version: 0.1)"
+            description="BoB YouTube Video Downloader Script (Version: 1.0.1)"
         )
         parser.add_argument("video_url", help="URL of the YouTube video to download")
         parser.add_argument("--resolution", help="Preferred resolution for download (e.g., 720p)", default=None)
-        parser.add_argument('--version', action='version', version='%(prog)s 0.1')
+        parser.add_argument('--version', action='version', version='%(prog)s 1.0.1')
         args = parser.parse_args()
 
         # Get the video URL
