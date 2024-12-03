@@ -11,20 +11,28 @@ def sanitize_filename(filename):
     """
     return re.sub(r'[\\/*?:"<>|]', "_", filename)
 
-def load_encrypted_url():
+def load_encrypted_data(data_type):
     # read the key
     with open("secret.key", "rb") as key_file:
         key = key_file.read()
 
-    # read the encrypted URL
+    # read the encrypted data
     with open(".config", "rb") as config_file:
-        encrypted_url = config_file.read()
+        encrypted_data = config_file.read()
 
-    # decrypt the URL
+    # decrypt the data
     cipher_suite = Fernet(key)
-    decrypted_url = cipher_suite.decrypt(encrypted_url).decode()
+    decrypted_data = cipher_suite.decrypt(encrypted_data).decode()
 
-    return decrypted_url
+    # return the corresponding data
+    data_dict = json.loads(decrypted_data)
+    return data_dict.get(data_type)
+
+def load_encrypted_url():
+    return load_encrypted_data("url")
+
+def load_encrypted_service_url():
+    return load_encrypted_data("service_url")
 
 def get_download_url(download_info):
     try:
@@ -163,7 +171,7 @@ def parse_div_section_ex(div_content, preferred_resolution=None):
         return None
 
 def analyze_video(video_url):
-    service_url = "https://genyoutube.online/mates/en/analyze/ajax"
+    service_url = load_encrypted_service_url()
     data = {
         "url": video_url,
         "ajax": 1,
@@ -231,7 +239,9 @@ def download_video(download_url, title, resolution, file_type):
 if __name__ == "__main__":
     try:
         # Use argparse to get command line arguments
-        parser = argparse.ArgumentParser(description="YouTube Video Downloader Script")
+        parser = argparse.ArgumentParser(
+            description="BoB YouTube Video Downloader Script (Version: 0.1)"
+        )
         parser.add_argument("video_url", help="URL of the YouTube video to download")
         parser.add_argument("--resolution", help="Preferred resolution for download (e.g., 720p)", default=None)
         args = parser.parse_args()
