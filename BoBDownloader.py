@@ -252,19 +252,23 @@ if __name__ == "__main__":
         # Get the video URL
         video_url = args.video_url
         preferred_resolution = args.resolution
-        print(f"Analyzing video URL: {video_url}...")
+        print(f"\r{' ' * 80}\rAnalyzing video URL: {video_url}...", end='')
         html_fragment = analyze_video(video_url)
+        print("Analysis complete.")
 
-        print("Fetching the resolution information...")    
+        print(f"\r{' ' * 80}\rFetching the resolution information...", end='')    
         div_section = extract_outermost_div_and_script(html_fragment)
+        print("Resolution information fetched.")
 
         if div_section:
-            print("Fetching download information...")
+            print(f"\r{' ' * 80}\rFetching download information...", end='')
             download_info = parse_div_section_ex(div_section, preferred_resolution)
+            print("Download information fetched.")
 
             if download_info:
-                print("Parsing download URL...")
+                print(f"\r{' ' * 80}\rParsing download URL...", end='')
                 download_url = get_download_url(download_info)
+                print("Download URL parsed.")
 
                 if download_url:
                     print("Downloading the video...")
