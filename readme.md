@@ -7,9 +7,17 @@ A Python script for downloading YouTube videos by extracting available resolutio
 - Extract video metadata from a YouTube link, including available resolutions and file sizes.
 - Allows the user to choose from available resolutions before downloading or specify a preferred resolution as a command-line argument.
 - Downloads the selected video resolution with proper filename sanitization to prevent issues with file saving.
-- Command-line support for easy usage, with options for specifying a preferred resolution.
+- Command-line support for easy usage, with options for specifying a preferred resolution and output filename or directory.
 - Encrypted URL management for enhanced security.
-- Detailed download progress with human-readable file sizes.
+- Detailed download progress with human-readable file sizes, estimated download time remaining, and download speed.
+- Cross-platform support for packaging into executables (Windows, macOS, and Linux).
+
+## What's New in v1.0.2
+
+- **Code Structure Simplification**: Removed the need for external `.config` and `secret.key` files by embedding the encrypted data directly in the script. This change reduces the complexity of file management and improves ease of deployment.
+- **Estimated Download Time**: Added download speed calculation and estimated remaining time during the video download, providing a more informative download progress experience.
+- **Enhanced Download Progress**: Improved download progress updates to include details such as download speed, percentage completion, and estimated time left.
+- **Error Handling Improvements**: Added better error handling across various functions to enhance the robustness and reliability of the script.
 
 ## Requirements
 
@@ -50,10 +58,10 @@ A Python script for downloading YouTube videos by extracting available resolutio
 
 2. **Run the Script**
 
-   - The script can be executed using the command line by passing the YouTube video URL as an argument. You can also specify a preferred resolution using the `--resolution` flag:
+   - The script can be executed using the command line by passing the YouTube video URL as an argument. You can also specify a preferred resolution using the `--resolution` flag and an output path using the `--output` flag:
 
      ```sh
-     python3 down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p
+     python3 down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --output "path/to/output/file.mp4"
      ```
 
    - If you do not pass the video URL, the script will prompt you to provide a valid URL.
@@ -73,7 +81,7 @@ Fetching download information...
 Parsing download URL...
 Downloading the video...
 File name: video_title_720p.mp4
-Downloaded 22.62 MB of 22.62 MB (100.00%)
+Downloaded 22.62 MB of 22.62 MB (100.00%) at 2.2 MB/s, ETA: 0.00s
 Download completed: video_title_720p.mp4
 ```
 
@@ -114,9 +122,9 @@ To make the downloader available as an executable, you can use the provided pack
 - **`extract_outermost_div_and_script(html_content)`**: Extracts the main `<div>` tag containing video information from the returned HTML content.
 - **`parse_div_section_ex(div_content, preferred_resolution)`**: Parses the `<div>` content to extract information on available resolutions, presents them for the user to choose from, or selects the preferred resolution if specified.
 - **`get_download_url(download_info)`**: Sends a POST request to retrieve the actual download URL for the video.
-- **`download_video(download_url, title, resolution, file_type)`**: Downloads the video from the generated download URL and provides real-time progress updates.
+- **`download_video(download_url, title, resolution, file_type, output_path)`**: Downloads the video from the generated download URL and provides real-time progress updates.
 - **`sanitize_filename(filename)`**: Sanitizes filenames to remove illegal characters for cross-platform compatibility.
-- **`load_encrypted_url()`**: Loads and decrypts the base URL for requesting download information.
+- **`load_encrypted_url()`** and **`load_encrypted_service_url()`**: Load and decrypt the base URLs for requesting download information and service analysis.
 
 ## Requirements and Notes
 
