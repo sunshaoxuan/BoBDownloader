@@ -35,10 +35,7 @@ def load_encrypted_data(data_type):
     try:
         cipher_suite = Fernet(secret_key)
         decrypted_data = cipher_suite.decrypt(encrypted_config).decode()
-        print(decrypted_data)
         data_dict = json.loads(decrypted_data)
-        print(data_dict)
-        print(data_dict.get(data_type))
         return data_dict.get(data_type)
     except Exception as e:
         print(f"Error loading encrypted data: {e}")
@@ -63,7 +60,7 @@ def get_download_url(download_info):
     for attempt in range(max_retries):
         try:
             download_host_url = load_encrypted_url() + download_info['id']
-            print(f"Attempting to download from: {download_host_url}")
+            print(f"Attempting to download ...")
 
             headers = {"x-note": download_info["note"]}
             data = {
