@@ -4,7 +4,7 @@
 # It first creates/uses a clean virtual environment so that only necessary packages
 # are installed, which helps reduce the final executable size.
 #
-# Usage: ./build.sh [windows|macos|linux]
+# Usage: ./build.sh [macos|linux]
 
 envName="clean_env"
 distDir="dist"
@@ -29,17 +29,6 @@ pip install pyinstaller requests beautifulsoup4 tqdm
 # 创建 dist 目录（如果不存在）
 mkdir -p "$distDir"
 
-function build_windows_exe {
-    echo "Building Windows executable..."
-    pyinstaller --onefile --clean --name "BoBDownloader_win" "$scriptName"
-    if [ $? -eq 0 ]; then
-        echo "Windows executable created successfully."
-        mv "dist/BoBDownloader_win.exe" "$distDir/"
-    else
-        echo "Failed to build Windows executable."
-    fi
-}
-
 function build_macos_exec {
     echo "Building macOS executable..."
     pyinstaller --onefile --clean --name "BoBDownloader_mac" "$scriptName"
@@ -63,15 +52,13 @@ function build_linux_exec {
 }
 
 # 根据参数决定打包目标
-if [ "$1" == "windows" ]; then
-    build_windows_exe
-elif [ "$1" == "macos" ]; then
+if [ "$1" == "macos" ]; then
     build_macos_exec
 elif [ "$1" == "linux" ]; then
     build_linux_exec
 else
-    echo "Usage: $0 [windows|macos|linux]"
-    echo "Specify 'windows' to build for Windows, 'macos' for macOS, or 'linux' for Linux."
+    echo "Usage: $0 [macos|linux]"
+    echo "Specify build target for 'macos' for macOS, or 'linux' for Linux."
 fi
 
 echo "Packaging complete."
