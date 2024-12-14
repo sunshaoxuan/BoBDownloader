@@ -36,6 +36,7 @@ def load_encrypted_data(data_type):
         cipher_suite = Fernet(secret_key)
         decrypted_data = cipher_suite.decrypt(encrypted_config).decode()
         data_dict = json.loads(decrypted_data)
+        # print(data_dict)
         return data_dict.get(data_type)
     except Exception as e:
         print(f"Error loading encrypted data: {e}")
@@ -53,14 +54,11 @@ def sanitize_filename(filename):
     return re.sub(r'[\\/*?:"<>|]', "_", filename)
 
 
-def get_download_url(download_info):
-    max_retries = 5  # Maximum number of retries
-    wait_time = 10  # Wait time in seconds between retries
-
+def get_download_url(download_info, max_retries, wait_time, conversion_wait_time):
     for attempt in range(max_retries):
         try:
             download_host_url = load_encrypted_url() + download_info['id']
-            print(f"Attempting to download ...")
+            print(f"Attempt {attempt + 1}/{max_retries}: Requesting download URL...")
 
             headers = {"x-note": download_info["note"]}
             data = {
@@ -77,19 +75,25 @@ def get_download_url(download_info):
             response.raise_for_status()
             response_data = response.json()
 
-            if response_data.get("status") == "success":
+            status = response_data.get("status")
+            if status == "success":
+                print("Success: Download URL retrieved.")
                 return response_data.get("downloadUrlX")
+            elif status == "convert_ready":
+                print("Conversion is not ready. Waiting for conversion to complete...")
+                time.sleep(conversion_wait_time)  # Wait before retrying
+            elif status == "busy":
+                print("Server is busy. Retrying after a short wait...")
+                time.sleep(wait_time)
             else:
-                print("Server returned status:", response_data.get("status"))
-                print(f"Attempt {attempt + 1}/{max_retries}: Retrying in {wait_time} seconds...")
+                print(f"Unexpected status: {status}. Retrying...")
                 time.sleep(wait_time)
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1}/{max_retries}: Failed to request download URL: {e}")
+            print(f"Attempt {attempt + 1}/{max_retries}: Request failed with error: {e}")
             time.sleep(wait_time)
 
-    print("Exceeded maximum retries. Please try again later.")
+    print("Failed to retrieve download URL after maximum retries.")
     return None
-
 
 def parse_onclick_content(onclick_content):
     params_pattern = r"download\('([^']*)','([^']*)','([^']*)','([^']*)',(\d+),'([^']*)','([^']*)'\)"
@@ -330,7 +334,10 @@ if __name__ == "__main__":
                     "  video_url            The URL of the YouTube video to download.\n"
                     "  --resolution         Preferred resolution (default: 720p).\n"
                     "  --auto-select        Automatically select alternative resolution if preferred is not available.\n"
-                    "  --output             Output path for the downloaded video.\n\n"
+                    "  --output             Output path for the downloaded video.\n"
+                    "  --max-retries        Maximum number of retries for download URL request (default: 5).\n"
+                    "  --wait-time          Wait time in seconds between retries (default: 10).\n"
+                    "  --conversion-wait    Wait time in seconds for 'convert_ready' status (default: 20).\n\n"
                     "Exit Codes:\n"
                     "  0  - Successful download\n"
                     "  1  - User interruption (e.g., Ctrl+C)\n"
@@ -348,6 +355,9 @@ if __name__ == "__main__":
     parser.add_argument("--auto-select", action="store_true", 
                       help="Automatically select alternative resolution if preferred is not available")
     parser.add_argument("--output", help="Output path for the downloaded video", default=None)
+    parser.add_argument("--max-retries", type=int, default=5, help="Maximum number of retries for download URL request")
+    parser.add_argument("--wait-time", type=int, default=10, help="Wait time in seconds between retries")
+    parser.add_argument("--conversion-wait", type=int, default=20, help="Wait time in seconds for 'convert_ready' status")
     args = parser.parse_args()
 
     try:
@@ -357,7 +367,7 @@ if __name__ == "__main__":
             if div_section:
                 download_info = parse_div_section_ex(div_section, args.resolution, args.auto_select)
                 if download_info:
-                    download_url = get_download_url(download_info)
+                    download_url = get_download_url(download_info, args.max_retries, args.wait_time, args.conversion_wait)
                     if download_url:
                         download_video(download_url, download_info['title'], 
                                      download_info['note'], download_info['ext'], args.output)
