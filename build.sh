@@ -10,7 +10,6 @@ envName="clean_env"
 distDir="dist"
 scriptName="BoBDownloader.py"
 
-# 创建并激活虚拟环境
 if [ ! -d "$envName" ]; then
     echo "Creating a new virtual environment..."
     python3 -m venv "$envName"
@@ -26,7 +25,6 @@ python -m pip install --upgrade pip
 echo "Installing required packages in the virtual environment..."
 pip install pyinstaller requests beautifulsoup4 tqdm
 
-# 创建 dist 目录（如果不存在）
 mkdir -p "$distDir"
 
 function build_macos_exec {
@@ -34,7 +32,7 @@ function build_macos_exec {
     pyinstaller --onefile --clean --name "BoBDownloader_mac" "$scriptName"
     if [ $? -eq 0 ]; then
         echo "macOS executable created successfully."
-        mv "dist/BoBDownloader_mac" "$distDir/"
+        mv -f "dist/BoBDownloader_mac" "$distDir/"
     else
         echo "Failed to build macOS executable."
     fi
@@ -45,13 +43,12 @@ function build_linux_exec {
     pyinstaller --onefile --clean --name "BoBDownloader_linux" "$scriptName"
     if [ $? -eq 0 ]; then
         echo "Linux executable created successfully."
-        mv "dist/BoBDownloader_linux" "$distDir/"
+        mv -f "dist/BoBDownloader_linux" "$distDir/"
     else
         echo "Failed to build Linux executable."
     fi
 }
 
-# 根据参数决定打包目标
 if [ "$1" == "macos" ]; then
     build_macos_exec
 elif [ "$1" == "linux" ]; then
@@ -63,5 +60,4 @@ fi
 
 echo "Packaging complete."
 
-# 注销虚拟环境
 deactivate
