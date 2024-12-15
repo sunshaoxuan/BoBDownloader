@@ -224,75 +224,73 @@ def analyze_video(video_url):
         return None
 
 def download_video(download_url, title, resolution, file_type, output_path=None):
+    sanitized_title = sanitize_filename(title)
+
+    # Determine output file name
+    if output_path and not os.path.isdir(output_path) and os.path.splitext(output_path)[1]:
+        output_file = output_path
+    else:
+        output_file = (os.path.join(output_path, f"{sanitized_title}_{resolution}.{file_type}")
+                       if output_path and os.path.isdir(output_path)
+                       else f"{sanitized_title}_{resolution}.{file_type}")
+
     try:
-        # Sanitize the filename
-        sanitized_title = sanitize_filename(title)
+        # Check the file size on the server
+        with requests.head(download_url, timeout=10) as head_response:
+            head_response.raise_for_status()
+            total_size = int(head_response.headers.get('content-length', 0))
+            print(f"Server-reported size: {total_size} bytes")
 
-        # Determine the output file path
-        if output_path:
-            if os.path.isdir(output_path):
-                output_file = os.path.join(output_path, f"{sanitized_title}_{resolution}.{file_type}")
-            else:
-                output_file = output_path
+        # Get already downloaded file size
+        downloaded_size = os.path.getsize(output_file) if os.path.exists(output_file) else 0
+
+        # If the file already exists and is complete, skip downloading
+        if downloaded_size >= total_size:
+            print(f"File {output_file} already exists and is complete. Skipping download.")
+            return
+
+        # Ensure the existing file size matches the expected range
+        if downloaded_size > 0:
+            headers = {"Range": f"bytes={downloaded_size}-"}
         else:
-            output_file = f"{sanitized_title}_{resolution}.{file_type}"
+            headers = {}
 
-        # Download the file using the provided link
-        print(f"File name: {output_file}")
-        response = requests.get(download_url, stream=True)
-        response.raise_for_status()
+        # Start downloading
+        with requests.get(download_url, headers=headers, stream=True, timeout=10) as response:
+            response.raise_for_status()
 
-        total_size = int(response.headers.get('content-length', 0))
-        downloaded_size = 0
-        start_time = time.time()  # Record the start time
+            # Validate server's response for Range request
+            content_range = response.headers.get('Content-Range')
+            if downloaded_size > 0 and not content_range:
+                print("Server does not support resuming downloads. Restarting download...")
+                os.remove(output_file)
+                downloaded_size = 0
 
-        with open(output_file, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    downloaded_size += len(chunk)
-                    
-                    # Calculate percentage
-                    percentage = (downloaded_size / total_size) * 100 if total_size else 0
-                    
-                    # Calculate download speed
-                    elapsed_time = time.time() - start_time
-                    speed = downloaded_size / elapsed_time if elapsed_time > 0 else 0
-                    
-                    # Estimate time remaining
-                    time_remaining = (total_size - downloaded_size) / speed if speed > 0 else float('inf')
-                    
-                    # Convert bytes to a human-readable format
-                    def human_readable_size(size, decimal_places=2):
-                        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-                            if size < 1024.0:
-                                return f"{size:.{decimal_places}f} {unit}"
-                            size /= 1024.0
-                        return f"{size:.{decimal_places}f} PB"
-
-                    # Clear the line and display the download progress
-                    print(f"\r{' ' * 80}\rDownloaded {human_readable_size(downloaded_size)} of {human_readable_size(total_size)} ({percentage:.2f}%) "
-                          f"at {human_readable_size(speed)}/s, ETA: {time_remaining:.2f}s", end='', flush=True)
+            with open(output_file, 'ab') as f, tqdm(
+                total=total_size, 
+                initial=downloaded_size, 
+                unit='B', 
+                unit_scale=True,
+                unit_divisor=1024,
+                desc=sanitized_title[:30] + "..."
+            ) as pbar:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+                        pbar.update(len(chunk))
 
         print(f"\nDownload completed: {output_file}")
+        if os.path.getsize(output_file) != total_size:
+            print(f"Warning: File size mismatch. Expected: {total_size}, Got: {os.path.getsize(output_file)}")
+            sys.exit(2)  # Exit with code 2 for file size mismatch
+        sys.exit(0)  # Exit with code 0 for successful download
+
     except requests.exceptions.RequestException as e:
         print(f"Download failed: {e}")
-
-# Example of a master branch related comment or logic
-# This logic is specific to the master branch
-def some_master_branch_function():
-    # Perform some operations specific to the master branch
-    pass
+        sys.exit(3)  # Exit with code 3 for download failure
 
 # Main script
 if __name__ == "__main__":
-    # Ensure this script is running on the master branch
-    current_branch = "master"  # This is a placeholder for actual branch checking logic
-    if current_branch == "master":
-        print("Running on the master branch")
-        # Execute master branch specific logic
-        some_master_branch_function()
-
     try:
         # Use argparse to get command line arguments
         parser = argparse.ArgumentParser(
