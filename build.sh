@@ -16,7 +16,6 @@ if [ ! -d "$envName" ]; then
 fi
 
 echo "Activating virtual environment..."
-# 激活虚拟环境（Linux/macOS方式）
 source "$envName/bin/activate"
 
 echo "Upgrading pip..."
@@ -33,7 +32,6 @@ function build_macos_exec {
     if [ $? -eq 0 ]; then
         echo "macOS executable created successfully."
         mv -f "dist/BoBDownloader_mac" "$distDir/"
->>>>>>> master
     else
         echo "Failed to build macOS executable."
     fi
