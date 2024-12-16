@@ -1,6 +1,6 @@
 # BoB YouTube Video Downloader
 
-A Python script for downloading YouTube videos by extracting available resolutions and allowing the user to select the preferred resolution for download. The script uses web scraping techniques to interact with a third-party YouTube video analysis service and simulate download actions.
+A Python script for downloading YouTube videos by extracting available resolutions and allowing the user to select the preferred resolution for download. The script uses encrypted URLs for secure communication and enhanced web scraping techniques for parsing video information.
 
 ---
 
@@ -10,7 +10,7 @@ A Python script for downloading YouTube videos by extracting available resolutio
 - Allows the user to choose from available resolutions before downloading or specify a preferred resolution as a command-line argument.
 - Downloads the selected video resolution with proper filename sanitization to prevent issues with file saving.
 - Command-line support for easy usage, with options for specifying a preferred resolution and output filename or directory.
-- **Encrypted URL management** for enhanced security.
+- **Encrypted URL management** for secure communication.
 - **Incomplete download resumption** with range header support.
 - **Intelligent resolution selection:** Automatically selects an alternative resolution if the preferred one is unavailable.
 - **Detailed error codes** for easier troubleshooting.
@@ -67,7 +67,7 @@ pip install requests beautifulsoup4 cryptography tqdm
 2. **Run the Script**
 
    ```sh
-   python down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --output "path/to/output/file.mp4"
+   python BoBDownloader.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --output "path/to/output/file.mp4"
    ```
 
 3. **Packaging (Optional)**
@@ -79,7 +79,7 @@ pip install requests beautifulsoup4 cryptography tqdm
 ## Usage
 
 ```sh
-python down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --auto-select --output "path/to/output/file.mp4"
+python BoBDownloader.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --auto-select --output "path/to/output/file.mp4"
 ```
 
 ### Command-Line Arguments
@@ -88,13 +88,18 @@ python down.py "https://www.youtube.com/watch?v=VIDEO_ID" --resolution 720p --au
 - `--resolution` (Optional): Specify the preferred resolution (default: `720p`).
 - `--auto-select` (Optional): Automatically choose an alternative resolution if the preferred one is unavailable.
 - `--output` (Optional): Specify the output file path or directory. Defaults to the current directory.
+- `--max-retries` (Optional): Maximum number of retries for download URL request (default: `5`).
+- `--wait-time` (Optional): Wait time in seconds between retries (default: `10`).
+- `--conversion-wait` (Optional): Wait time in seconds for 'convert_ready' status (default: `20`).
 
 ### Example
 
 ```sh
-$ python3 down.py "https://www.youtube.com/watch?v=gV5rQFCgCjA" --resolution 720p --auto-select
+$ python3 BoBDownloader.py "https://www.youtube.com/watch?v=gV5rQFCgCjA" --resolution 720p --auto-select
 
-Fetching resolution information...
+Analyzing video URL: https://www.youtube.com/watch?v=gV5rQFCgCjA...
+Analysis complete.
+Fetching the resolution information...
 Available resolutions:
 1. MP3 (26.42 MB)
 2. 720p (MP4) (294.65 MB)
