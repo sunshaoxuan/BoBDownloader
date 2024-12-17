@@ -336,13 +336,34 @@ if __name__ == "__main__":
         video_url = args.video_url
         preferred_resolution = args.resolution
         output_path = args.output
-        print(f"\r{' ' * 80}\rAnalyzing video URL: {video_url}...", end='')
-        html_fragment = analyze_video(video_url)
-        print("Analysis complete.")
 
-        print(f"\r{' ' * 80}\rFetching the resolution information...", end='')    
-        div_section = extract_outermost_div_and_script(html_fragment)
-        print("Resolution information fetched.")
+        # Retry logic for analyzing video
+        for attempt in range(max_retries):
+            print(f"\r{' ' * 80}\rAnalyzing video URL: {video_url} (Attempt {attempt + 1}/{max_retries})...", end='')
+            html_fragment = analyze_video(video_url)
+            if html_fragment:
+                print("Analysis complete.")
+                break
+            else:
+                print("Analysis failed. Retrying...")
+                time.sleep(wait_time)
+        else:
+            print("Failed to analyze video after maximum retries.")
+            sys.exit(7)  # Exit with code 7 for video analysis failed
+
+        # Retry logic for fetching resolution information
+        for attempt in range(max_retries):
+            print(f"\r{' ' * 80}\rFetching the resolution information (Attempt {attempt + 1}/{max_retries})...", end='')
+            div_section = extract_outermost_div_and_script(html_fragment)
+            if div_section:
+                print("Resolution information fetched.")
+                break
+            else:
+                print("Failed to fetch resolution information. Retrying...")
+                time.sleep(wait_time)
+        else:
+            print("Failed to fetch resolution information after maximum retries.")
+            sys.exit(6)  # Exit with code 6 for div section extraction failed
 
         if div_section:
             print(f"\r{' ' * 80}\rFetching download information...", end='')
