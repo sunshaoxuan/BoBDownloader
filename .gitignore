@@ -3,3 +3,5 @@
 /build
 /.config
 /BoBDownloader_win.spec
+logs/
+*.log

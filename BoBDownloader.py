@@ -23,6 +23,8 @@ import os
 import time
 from tqdm import tqdm
 import sys
+import logging
+import signal
 
 # SECRET KEY
 secret_key = b'GIgwb1iHbTv8WNH6lewJD2Xl_wukBT8eH9ApXV5NyWs='
@@ -30,18 +32,32 @@ secret_key = b'GIgwb1iHbTv8WNH6lewJD2Xl_wukBT8eH9ApXV5NyWs='
 # ENCRYPTED CONFIG
 encrypted_config = b'gAAAAABnTlZM5RWhy_zIlX_8rfXtFWQOjtMsj_ipJzY355li_ibOWokSb0JLLvCUOj5Dz_fp5MOA3GfGZGAhXlWGkZXZZ9u72pDIqN2DapbeNYeFPXaJOKftFLYbz09Hmy9XS_5mY-3P22PuP4SaX3NCo0lRWB85OQja2KrsvHi_Ir5VGDD-hlNkN64a8h7T4rUO6vRpMdXmyTw8fBkeaIMnqtkI0JEmw7btPJdIwe7VGBZzgw2O2F8='
 
+# LOG DIRECTORY AND FILE
+LOG_DIR = "logs"
+LOG_FILE = os.path.join(LOG_DIR, "BoBDownloader.log")
+
+# ensure log directory exists
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Global variable to track if the process should terminate
+terminate_flag = False
+
+def signal_handler(signum, frame):
+    global terminate_flag
+    logger.warning("Received termination signal. Preparing to exit...")
+    terminate_flag = True
+
+# Register the signal handler
+signal.signal(signal.SIGTERM, signal_handler)
+
 def load_encrypted_data(data_type):
     try:
-        # Decrypt the data
         cipher_suite = Fernet(secret_key)
         decrypted_data = cipher_suite.decrypt(encrypted_config).decode()
-
-        # Return the corresponding data
         data_dict = json.loads(decrypted_data)
         return data_dict.get(data_type)
-
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
 
 def load_encrypted_url():
     return load_encrypted_data("url")
@@ -57,9 +73,13 @@ def sanitize_filename(filename):
 
 def get_download_url(download_info, max_retries, wait_time, conversion_wait_time):
     for attempt in range(max_retries):
+        if terminate_flag:
+            logger.warning("Download URL retrieval interrupted by termination signal.")
+            return None
+
         try:
             download_host_url = load_encrypted_url() + download_info['id']
-            print(f"Attempt {attempt + 1}/{max_retries}: Requesting download URL...")
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Requesting download URL...")
 
             headers = {"x-note": download_info["note"]}
             data = {
@@ -78,22 +98,38 @@ def get_download_url(download_info, max_retries, wait_time, conversion_wait_time
 
             status = response_data.get("status")
             if status == "success":
-                print("Success: Download URL retrieved.")
+                logger.info("Success: Download URL retrieved.")
                 return response_data.get("downloadUrlX")
             elif status == "convert_ready":
-                print("Conversion is not ready. Waiting for conversion to complete...")
-                time.sleep(conversion_wait_time)  # Wait before retrying
+                logger.info("Conversion is not ready. Waiting for conversion to complete...")
+                for _ in range(conversion_wait_time):
+                    if terminate_flag:
+                        logger.warning("Conversion wait interrupted by termination signal.")
+                        return None
+                    time.sleep(conversion_wait_time)
             elif status == "busy":
-                print("Server is busy. Retrying after a short wait...")
-                time.sleep(wait_time)
+                logger.info("Server is busy. Retrying after a short wait...")
+                for _ in range(wait_time):
+                    if terminate_flag:
+                        logger.warning("Busy wait interrupted by termination signal.")
+                        return None
+                    time.sleep(wait_time)
             else:
-                print(f"Unexpected status: {status}. Retrying...")
-                time.sleep(wait_time)
+                logger.warning(f"Unexpected status: {status}. Retrying...")
+                for _ in range(wait_time):
+                    if terminate_flag:
+                        logger.warning("Unexpected status wait interrupted by termination signal.")
+                        return None
+                    time.sleep(wait_time)
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1}/{max_retries}: Request failed with error: {e}")
-            time.sleep(wait_time)
+            logger.error(f"Attempt {attempt + 1}/{max_retries}: Request failed with error: {e}")
+            for _ in range(wait_time):
+                if terminate_flag:
+                    logger.warning("Request exception wait interrupted by termination signal.")
+                    return None
+                time.sleep(wait_time)
 
-    print("Failed to retrieve download URL after maximum retries.")
+    logger.error("Failed to retrieve download URL after maximum retries.")
     return None
 
 def parse_onclick_content(onclick_content):
@@ -102,11 +138,10 @@ def parse_onclick_content(onclick_content):
         match = re.search(params_pattern, onclick_content)
 
         if not match:
-            print("Failed to match the correct onclick parameter format")
+            logger.error("Failed to match the correct onclick parameter format")
             return None
 
         video_url, title, id, ext, total_size, note, format_ = match.groups()
-
         return {
             "video_url": video_url,
             "title": title,
@@ -117,26 +152,24 @@ def parse_onclick_content(onclick_content):
             "format": format_
         }
     except Exception as e:
-        print(f"Error parsing onclick content: {e}")
+        logger.error(f"Error parsing onclick content: {e}")
         return None
 
 def extract_outermost_div_and_script(html_content):
     try:
         soup = BeautifulSoup(html_content, 'html.parser')
-
         outer_div = soup.find('div', recursive=False)
         if not outer_div:
-            print("No resolution download information source found.")
+            logger.error("No resolution download information source found.")
             return None
         else:
-            print("Found resolution download information source")
-
+            logger.info("Found resolution download information source")
         return outer_div
     except Exception as e:
-        print(f"Error extracting address: {e}")
+        logger.error(f"Error extracting address: {e}")
         return None
 
-def parse_div_section_ex(div_content, preferred_resolution=None):
+def parse_div_section_ex(div_content, preferred_resolution=None, auto_select=False):
     """
     Parse the <div> section to extract information for all available resolutions, and let the user choose
     """
@@ -170,31 +203,43 @@ def parse_div_section_ex(div_content, preferred_resolution=None):
                         options.append(download_info)
 
         if not options:
-            print("No available resolution information found")
+            logger.error("No available resolution information found")
             return None
-
+    
         # If the preferred resolution is specified, try to find it in the options
         if preferred_resolution:
             for option in options:
                 if preferred_resolution in option['resolution']:
                     return option
-            print(f"Preferred resolution {preferred_resolution} not found, please choose manually.")
+            
+            if auto_select:
+                logger.info(f"Preferred resolution {preferred_resolution} not found, auto-selecting available option")
+                return options[0]  # select the first option if auto-select is enabled
+            else:
+                logger.info(f"Preferred resolution {preferred_resolution} not found, please choose manually")
+
+        # If only one option is available and auto-select is enabled
+        if len(options) == 1 and auto_select:
+            return options[0]
 
         # List all available resolutions and let the user choose
-        print("\nAvailable Resolutions:")
-        for index, option in enumerate(options, start=1):
-            print(f"{index}. Resolution: {option['resolution']}, Size: {option['size']}")
+        if not auto_select:
+            print("\nAvailable Resolutions:")
+            for index, option in enumerate(options, start=1):
+                print(f"{index}. Resolution: {option['resolution']}, Size: {option['size']}")
 
-        choice = input("Enter the number of the resolution you want to download: ")
-        
-        if not choice.isdigit() or int(choice) < 1 or int(choice) > len(options):
-            print("Invalid input, please rerun the program and select a valid number.")
-            return None
+            choice = input("Enter the number of the resolution you want to download: ")
+            
+            if not choice.isdigit() or int(choice) < 1 or int(choice) > len(options):
+                logger.error("Invalid input, please rerun the program and select a valid number")
+                return None
 
-        return options[int(choice) - 1]
+            return options[int(choice) - 1]
+        else:
+            return options[0]  # select the first option if auto-select is enabled
 
     except Exception as e:
-        print(f"Error parsing <div> section: {e}")
+        logger.error(f"Error parsing <div> section: {e}")
         return None
 
 def analyze_video(video_url):
@@ -227,27 +272,30 @@ def download_video(download_url, title, resolution, file_type, output_path=None)
     sanitized_title = sanitize_filename(title)
 
     # Determine output file name
-    if output_path and not os.path.isdir(output_path) and os.path.splitext(output_path)[1]:
+    if output_path and os.path.isfile(output_path):
+        # If output_path is a file, use it directly
         output_file = output_path
+    elif output_path and os.path.isdir(output_path):
+        # If output_path is a directory, construct the file name
+        output_file = os.path.join(output_path, f"{sanitized_title}_{resolution}.{file_type}")
     else:
-        output_file = (os.path.join(output_path, f"{sanitized_title}_{resolution}.{file_type}")
-                       if output_path and os.path.isdir(output_path)
-                       else f"{sanitized_title}_{resolution}.{file_type}")
+        # Default to current directory with constructed file name
+        output_file = f"{sanitized_title}_{resolution}.{file_type}"
 
     try:
         # Check the file size on the server
         with requests.head(download_url, timeout=10) as head_response:
             head_response.raise_for_status()
             total_size = int(head_response.headers.get('content-length', 0))
-            print(f"Server-reported size: {total_size} bytes")
+            logger.info(f"Server-reported size: {total_size} bytes")
 
         # Get already downloaded file size
         downloaded_size = os.path.getsize(output_file) if os.path.exists(output_file) else 0
 
         # If the file already exists and is complete, skip downloading
-        if downloaded_size >= total_size:
-            print(f"File {output_file} already exists and is complete. Skipping download.")
-            return
+        if downloaded_size == total_size:
+            logger.info(f"File {output_file} already exists and is complete. Skipping download.")
+            return 9  # specific exit code to indicate that the file already exists and is complete
 
         # Ensure the existing file size matches the expected range
         if downloaded_size > 0:
@@ -262,7 +310,7 @@ def download_video(download_url, title, resolution, file_type, output_path=None)
             # Validate server's response for Range request
             content_range = response.headers.get('Content-Range')
             if downloaded_size > 0 and not content_range:
-                print("Server does not support resuming downloads. Restarting download...")
+                logger.warning("Server does not support resuming downloads. Restarting download...")
                 os.remove(output_file)
                 downloaded_size = 0
 
@@ -272,22 +320,47 @@ def download_video(download_url, title, resolution, file_type, output_path=None)
                 unit='B', 
                 unit_scale=True,
                 unit_divisor=1024,
-                desc=sanitized_title[:30] + "..."
+                desc=sanitized_title[:30] + "...",
+                disable=args.silent  # disable progress bar if silent mode is enabled
             ) as pbar:
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
                         f.write(chunk)
                         pbar.update(len(chunk))
+                    
+                    # Check if termination signal was received
+                    if terminate_flag:
+                        logger.warning(f"Download interrupted by termination signal. Progress: {pbar.n}/{total_size} bytes.")
+                        return 1  # user interruption
 
-        print(f"\nDownload completed: {output_file}")
+        logger.info(f"\nDownload completed: {output_file}")
         if os.path.getsize(output_file) != total_size:
-            print(f"Warning: File size mismatch. Expected: {total_size}, Got: {os.path.getsize(output_file)}")
-            sys.exit(2)  # Exit with code 2 for file size mismatch
-        sys.exit(0)  # Exit with code 0 for successful download
+            logger.error(f"Warning: File size mismatch. Expected: {total_size}, Got: {os.path.getsize(output_file)}")
+            return 2  # file size mismatch
+        return 0  # successful completion
 
     except requests.exceptions.RequestException as e:
-        print(f"Download failed: {e}")
-        sys.exit(3)  # Exit with code 3 for download failure
+        logger.error(f"Download failed: {e}")
+        return 3  # download failure
+
+    except KeyboardInterrupt:
+        logger.warning(f"\nDownload interrupted by user. Progress: {pbar.n}/{total_size} bytes.")
+        return 1  # user interruption
+
+def setup_logging(silent_mode):
+    # ensure log directory exists
+    os.makedirs(LOG_DIR, exist_ok=True)
+    
+    handlers = [logging.FileHandler(LOG_FILE, encoding='utf-8')]
+    if not silent_mode:
+        handlers.append(logging.StreamHandler())
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - [Thread-%(thread)d] - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+    return logging.getLogger(__name__)
 
 # Main script
 if __name__ == "__main__":
@@ -325,8 +398,12 @@ if __name__ == "__main__":
         parser.add_argument("--max-retries", type=int, default=5, help="Maximum number of retries for download URL request")
         parser.add_argument("--wait-time", type=int, default=10, help="Wait time in seconds between retries")
         parser.add_argument("--conversion-wait", type=int, default=20, help="Wait time in seconds for 'convert_ready' status")
+        parser.add_argument("--silent", action="store_true", help="Run in silent mode (log to file only)")
         args = parser.parse_args()
 
+        # Set up logging
+        logger = setup_logging(args.silent)
+        
         # Use the parsed arguments
         max_retries = args.max_retries
         wait_time = args.wait_time
@@ -336,47 +413,35 @@ if __name__ == "__main__":
         video_url = args.video_url
         preferred_resolution = args.resolution
         output_path = args.output
+        
+        logger.info(f"Analyzing video URL: {video_url}")
+        html_fragment = analyze_video(video_url)
+        logger.info("Analysis complete")
 
-        # Retry logic for analyzing video
-        for attempt in range(max_retries):
-            print(f"\r{' ' * 80}\rAnalyzing video URL: {video_url} (Attempt {attempt + 1}/{max_retries})...", end='')
-            html_fragment = analyze_video(video_url)
-            if html_fragment:
-                print("Analysis complete.")
-                break
-            else:
-                print("Analysis failed. Retrying...")
-                time.sleep(wait_time)
-        else:
-            print("Failed to analyze video after maximum retries.")
-            sys.exit(7)  # Exit with code 7 for video analysis failed
-
-        # Retry logic for fetching resolution information
-        for attempt in range(max_retries):
-            print(f"\r{' ' * 80}\rFetching the resolution information (Attempt {attempt + 1}/{max_retries})...", end='')
-            div_section = extract_outermost_div_and_script(html_fragment)
-            if div_section:
-                print("Resolution information fetched.")
-                break
-            else:
-                print("Failed to fetch resolution information. Retrying...")
-                time.sleep(wait_time)
-        else:
-            print("Failed to fetch resolution information after maximum retries.")
-            sys.exit(6)  # Exit with code 6 for div section extraction failed
+        logger.info("Fetching the resolution information")    
+        div_section = extract_outermost_div_and_script(html_fragment)
+        logger.info("Resolution information fetched")
 
         if div_section:
-            print(f"\r{' ' * 80}\rFetching download information...", end='')
-            download_info = parse_div_section_ex(div_section, preferred_resolution)
-            print("Download information fetched.")
+            logger.info("Fetching download information")
+            download_info = parse_div_section_ex(div_section, preferred_resolution, args.auto_select)
+            logger.info("Download information fetched")
 
             if download_info:
-                print(f"\r{' ' * 80}\rParsing download URL...", end='')
+                logger.info("Parsing download URL")
                 download_url = get_download_url(download_info, max_retries, wait_time, conversion_wait_time)
-                print("Download URL parsed.")
+                logger.info("Download URL parsed")
 
                 if download_url:
-                    print("Downloading the video...")
-                    download_video(download_url, download_info["title"], download_info["note"], download_info["ext"], output_path)
+                    logger.info("Downloading the video...")
+                    success = download_video(download_url, download_info["title"], 
+                                          download_info["note"], download_info["ext"], 
+                                          output_path)
+                    if success == 0:
+                        sys.exit(0)  # successful completion
+                    elif success == 2:
+                        sys.exit(2)  # file size mismatch
+                    else:
+                        sys.exit(success)  # download failure
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
